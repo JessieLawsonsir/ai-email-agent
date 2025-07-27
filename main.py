@@ -1,14 +1,15 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 import mysql.connector
+import os
 
 app = FastAPI()
 
-# ✅ MySQL Configuration
+# ✅ MySQL Configuration (No hardcoded password)
 DB_CONFIG = {
     "host": "localhost",
     "user": "root",
-    "password": "qwert12345",
+    "password": os.getenv("MYSQL_PASSWORD"),  # 🔒 Use env var
     "database": "email_agent"
 }
 

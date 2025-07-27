@@ -7,18 +7,20 @@ import base64
 import os
 import email
 
-# 🔐 Gmail Access Scope
+# 🔐 Gmail read-only access scope
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
-# 🎯 Load FLAN-T5 Model
+# 🎯 Load FLAN-T5 Model for summarization
 tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-small")
 model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-small")
 
 def authenticate_gmail():
     creds = None
+    # Use stored token if available
     if os.path.exists("token.json"):
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
     else:
+        # Authenticate and store token
         flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
         creds = flow.run_local_server(port=0)
         with open("token.json", "w") as token:
@@ -49,6 +51,7 @@ def get_unread_emails(service):
         subject = [h["value"] for h in headers if h["name"] == "Subject"]
         subject = subject[0] if subject else "(No Subject)"
 
+        # Extract plain text body
         parts = payload.get("parts", [])
         body = ""
         for part in parts:

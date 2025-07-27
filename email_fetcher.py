@@ -7,10 +7,10 @@ import logging
 import os
 from dotenv import load_dotenv
 
-# ✅ Load environment variables
+# ✅ Load environment variables from .env file
 load_dotenv()
 
-# ✅ MySQL DB settings from .env
+# ✅ MySQL DB settings from .env (no password hardcoded)
 DB_CONFIG = {
     "host": os.getenv("DB_HOST"),
     "user": os.getenv("DB_USER"),

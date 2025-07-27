@@ -1,0 +1,25 @@
+# Sensitive credentials
+.env
+token.json
+credentials.json
+
+# Python
+__pycache__/
+*.pyc
+
+# PyCharm
+.idea/
+
+# Jupyter (if used)
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# MySQL-related
+*.sql
+*.db
+*.sqlite
+
+# Optional: VS Code
+.vscode/

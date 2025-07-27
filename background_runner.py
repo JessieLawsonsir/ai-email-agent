@@ -11,11 +11,11 @@ import mysql.connector
 # ✅ Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# ✅ MySQL config
+# ✅ MySQL config (use env vars or secrets manager in production)
 DB_CONFIG = {
     "host": "localhost",
     "user": "root",
-    "password": "qwert12345",
+    "password": "YOUR_PASSWORD_HERE",  # 🔒 Replace before deployment
     "database": "email_agent"
 }
 
@@ -23,6 +23,15 @@ DB_CONFIG = {
 model_name = "google/flan-t5-large"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+
+# ✅ Get Gmail label ID dynamically
+def get_label_id(service, label_name="Processed"):
+    results = service.users().labels().list(userId='me').execute()
+    labels = results.get('labels', [])
+    for label in labels:
+        if label['name'].lower() == label_name.lower():
+            return label['id']
+    return None
 
 # ✅ Convert weekday name to date
 def convert_to_date(weekday_name):
@@ -163,13 +172,13 @@ def send_reply(service, sender_email, subject, thread_id, email_body):
         return None
 
 # ✅ Main processor
-def process_emails(service):
+def process_emails(service, processed_label_id):
     logging.info("🔁 Checking for new emails...")
 
     results = service.users().messages().list(
         userId='me',
         labelIds=['INBOX'],
-        q="is:unread -label:Label_1656979218593678986"
+        q="is:unread -label:" + processed_label_id
     ).execute()
 
     messages = results.get('messages', [])
@@ -181,7 +190,6 @@ def process_emails(service):
     for msg in messages:
         msg_id = msg['id']
 
-        # Check if already processed
         conn = mysql.connector.connect(**DB_CONFIG)
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM emails WHERE message_id = %s", (msg_id,))
@@ -201,7 +209,6 @@ def process_emails(service):
         sender = next((h['value'] for h in headers if h['name'] == 'From'), "(Unknown Sender)")
         thread_id = msg_data.get('threadId')
 
-        # Get body
         body = ""
         parts = payload.get('parts', [])
         if parts:
@@ -221,19 +228,17 @@ def process_emails(service):
         save_summary(sender, subject, summary)
 
         product, quantity, location, delivery_date = extract_order_info(body)
-
         ai_reply = send_reply(service, sender, subject, thread_id, body)
 
         if product and quantity and location and delivery_date and ai_reply:
             save_order(sender, product, quantity, location, delivery_date, msg_id, ai_reply)
 
-        # Mark as processed
         service.users().messages().modify(
             userId='me',
             id=msg_id,
             body={
                 'removeLabelIds': ['UNREAD'],
-                'addLabelIds': ['Label_1656979218593678986']
+                'addLabelIds': [processed_label_id]
             }
         )
         logging.info(f"✅ Marked as processed: {subject}")
@@ -242,11 +247,16 @@ def process_emails(service):
 def run_every_5_seconds():
     scheduler = BlockingScheduler()
     service = get_gmail_service()
+    processed_label_id = get_label_id(service, "Processed")
+
+    if not processed_label_id:
+        logging.error("❌ 'Processed' label not found in Gmail. Please create it.")
+        return
 
     @scheduler.scheduled_job("interval", seconds=5)
     def job():
         try:
-            process_emails(service)
+            process_emails(service, processed_label_id)
         except Exception as e:
             logging.error(f"❌ Job error: {e}")
 

@@ -6,10 +6,14 @@ import mysql.connector
 import base64
 import os
 import email
+from dotenv import load_dotenv
+
+# ✅ Load environment variables
+load_dotenv()
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
-# ✅ Load tokenizer and model (Upgraded to base for better quality)
+# ✅ Load tokenizer and model
 tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-base")
 model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-base")
 
@@ -37,10 +41,10 @@ def summarize(text):
 def store_summary(message_id, sender, subject, body, summary):
     try:
         conn = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="qwert12345",
-            database="email_agent"
+            host=os.getenv("DB_HOST"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            database=os.getenv("DB_NAME")
         )
         cursor = conn.cursor()
         cursor.execute("""
@@ -84,7 +88,6 @@ def process_emails(service):
                         body = base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore").strip()
                         break
         else:
-            # fallback to single body
             data = payload.get("body", {}).get("data")
             if data:
                 body = base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore").strip()
@@ -100,7 +103,7 @@ def process_emails(service):
             print(f"📧 Subject: {subject}")
             print("⚠️ No readable body found.\n" + "-" * 60)
 
-# ✅ Run the whole thing
+# ✅ Run everything
 if __name__ == "__main__":
     service = authenticate_gmail()
     process_emails(service)

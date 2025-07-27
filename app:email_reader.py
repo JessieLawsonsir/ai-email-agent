@@ -4,11 +4,11 @@ import mysql.connector
 
 app = FastAPI()
 
-# ✅ MySQL DB Configuration
+# ✅ MySQL DB Configuration (Do NOT hardcode credentials in production)
 DB_CONFIG = {
     "host": "localhost",
-    "user": "root",
-    "password": "qwert12345",  # 🔒 Change this if your password is different
+    "user": "your_db_user",          # 🔒 Replace with your actual DB user or use environment variables
+    "password": "your_db_password",  # 🔒 Avoid hardcoding passwords
     "database": "email_agent"
 }
 

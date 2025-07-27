@@ -6,10 +6,6 @@
 ![Status](https://img.shields.io/badge/Status-In_Progress-yellow)
 
 
-![Uploading robot-with-mail-symbol.jpg…]()
-
-
-
 ---
 
 ## 📌 Overview

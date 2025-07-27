@@ -5,40 +5,38 @@ from googleapiclient.discovery import build
 from email.mime.text import MIMEText
 import logging
 import os
+from dotenv import load_dotenv
 
-# ✅ MySQL DB settings
+# ✅ Load environment variables
+load_dotenv()
+
+# ✅ MySQL DB settings from .env
 DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "qwert12345",
-    "database": "email_agent"
+    "host": os.getenv("DB_HOST"),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
+    "database": os.getenv("DB_NAME")
 }
 
-# ✅ Save email to MySQL
 def insert_email_to_db(sender, subject, body):
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
         cursor = conn.cursor()
-
         query = """
             INSERT INTO emails (sender, subject, body)
             VALUES (%s, %s, %s)
         """
         cursor.execute(query, (sender, subject, body))
         conn.commit()
-
         cursor.close()
         conn.close()
         print("✅ Email saved to DB")
-
     except mysql.connector.Error as err:
         print(f"❌ DB Error: {err}")
 
-# ✅ Extract sender, subject, and body from message
 def extract_email_details(msg_data):
     headers = msg_data['payload']['headers']
     parts = msg_data['payload'].get('parts', [])
-
     sender = subject = body = ""
 
     for header in headers:
@@ -53,7 +51,6 @@ def extract_email_details(msg_data):
             body_data = part['body'].get('data')
             if body_data:
                 decoded_text = base64.urlsafe_b64decode(body_data).decode('utf-8', errors='ignore').strip()
-
                 if mime_type == 'text/plain' and not body:
                     body = decoded_text
                     break
@@ -62,17 +59,14 @@ def extract_email_details(msg_data):
 
     return sender, subject, body
 
-# ✅ Generate smart auto-reply text (rule-based for now)
 def generate_reply(subject, body):
     return f"""Hello,
 
 Thank you for your email regarding "{subject}". We’ve received your message and will get back to you shortly.
 
 Best regards,  
-Jessie Lawson  
 Client Support"""
 
-# ✅ Send reply via Gmail API
 def send_reply(service, to_email, original_subject, reply_text, thread_id):
     reply_subject = f"Re: {original_subject}"
     message = MIMEText(reply_text)
@@ -91,11 +85,9 @@ def send_reply(service, to_email, original_subject, reply_text, thread_id):
     except Exception as e:
         print(f"❌ Failed to send reply: {e}")
 
-# ✅ Main fetch logic with auto-reply
 def fetch_and_store_emails():
     creds = Credentials.from_authorized_user_file('token.json')
     service = build('gmail', 'v1', credentials=creds)
-
     results = service.users().messages().list(userId='me', labelIds=['INBOX'], q='is:unread').execute()
     messages = results.get('messages', [])
 
@@ -114,10 +106,8 @@ def fetch_and_store_emails():
         print("📝 Body:", body[:200], "...")
 
         insert_email_to_db(sender, subject, body)
-
         reply_text = generate_reply(subject, body)
         send_reply(service, to_email, subject, reply_text, thread_id)
 
-# 🚀 Run script
 if __name__ == "__main__":
     fetch_and_store_emails()

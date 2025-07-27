@@ -1,11 +1,14 @@
 import logging
 import base64
-import re
-from datetime import datetime, timedelta
+import os
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 import mysql.connector
+from dotenv import load_dotenv
+
+# ✅ Load environment variables from .env file
+load_dotenv()
 
 # 🔐 Gmail API scopes
 SCOPES = [
@@ -15,12 +18,12 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.labels"
 ]
 
-# 🛠️ MySQL DB config
+# ✅ MySQL DB config from environment variables
 DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "qwert12345",
-    "database": "email_agent"
+    "host": os.getenv("DB_HOST"),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
+    "database": os.getenv("DB_NAME")
 }
 
 # Setup logging
@@ -33,7 +36,6 @@ def authenticate_gmail():
 
     if os.path.exists(token_path):
         creds = Credentials.from_authorized_user_file(token_path, SCOPES)
-        # Check token validity and scopes
         if not creds or not creds.valid or not all(scope in creds.scopes for scope in SCOPES):
             os.remove(token_path)
             return authenticate_gmail()
@@ -47,10 +49,6 @@ def authenticate_gmail():
 
 
 def detect_intent(email_body):
-    """
-    Simple manual intent classification based on keywords.
-    You can later replace this with ML models.
-    """
     body = email_body.lower()
     if "order" in body or "purchase" in body or "buy" in body:
         return "order"
@@ -63,16 +61,12 @@ def detect_intent(email_body):
 
 
 def store_email_to_db(sender, subject, body, msg_id, intent=None):
-    """
-    Save email to DB, insert intent during insert or update intent if email exists.
-    """
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
         cursor = conn.cursor()
 
         cursor.execute("SELECT id FROM emails WHERE message_id = %s", (msg_id,))
         if cursor.fetchone():
-            # Email exists, update intent if provided
             if intent:
                 cursor.execute("UPDATE emails SET intent = %s WHERE message_id = %s", (intent, msg_id))
                 conn.commit()
@@ -108,7 +102,6 @@ def get_unread_emails(service):
         subject = next((h['value'] for h in headers if h['name'] == 'Subject'), "(No Subject)")
         sender = next((h['value'] for h in headers if h['name'] == 'From'), "(Unknown Sender)")
 
-        # Decode plain-text body
         body = ""
         parts = payload.get('parts', [])
         if parts:
@@ -123,14 +116,9 @@ def get_unread_emails(service):
             if data:
                 body = base64.urlsafe_b64decode(data).decode('utf-8')
 
-        # Detect intent
         intent = detect_intent(body)
         logging.info(f"Detected intent: {intent} for message ID {msg_id}")
-
-        # Save to DB with intent
         store_email_to_db(sender, subject, body, msg_id, intent)
-
-        # Optionally, mark email as read or move label here if needed
 
 
 if __name__ == "__main__":
